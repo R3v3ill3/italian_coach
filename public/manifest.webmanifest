@@ -1,0 +1,9 @@
+{
+  "name": "Parla! Italian Coach",
+  "short_name": "Parla!",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF3E7",
+  "theme_color": "#FAF3E7",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

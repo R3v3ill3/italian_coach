@@ -1,0 +1,3 @@
+# Standalone project — do not fold into the parent monorepo workspace.
+packages:
+  - '.'
