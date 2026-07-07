@@ -46,19 +46,25 @@ Open the URL in Safari on the phone → Share → **Add to Home Screen**. It run
 
 ## Enable the AI features
 
-1. Get an API key at [console.anthropic.com](https://console.anthropic.com).
-2. In the app: **⚙️ Settings → AI Coach** → paste the key (stored only in that device's local storage).
+The Claude key lives **server-side** in a Vercel serverless function ([`api/claude.js`](api/claude.js)) — it's never shipped to the browser, so a public URL can't leak it. A shared passcode gates the app and the proxy.
 
-This unlocks:
+In your Vercel project → **Settings → Environment Variables** (Production), add:
 
-- **Coach Gio** — personalised pronunciation feedback after each speaking attempt, tuned for Australian English speakers.
+| Name | Value | Purpose |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | your key from [console.anthropic.com](https://console.anthropic.com) | powers all AI features |
+| `APP_PASSCODE` | a passphrase you choose | required to open the app + use the proxy |
+
+Then **redeploy** (env-var changes don't rebuild automatically). Open the app, enter the passcode once, and these unlock:
+
+- **Coach Gio** — personalised pronunciation feedback, tuned for Australian English speakers.
 - **Conversa** — the role-play conversation partner.
 - **Storie** — the on-demand graded story generator.
 - **Smart Lens** — OCR-error-tolerant translations plus "worth learning" phrases with tips.
 
-Without a key the core course, review deck and basic Lens translation still work.
+Without the backend configured, the core course, review deck and basic (MyMemory) Lens translation still work. The **Settings** page shows whether AI is active. If you leave `APP_PASSCODE` unset the app is fully public — anyone with the URL can spend your Claude credit — so setting it (plus a monthly spend cap on the key) is recommended.
 
-**Alternative:** set `VITE_ANTHROPIC_API_KEY` in a `.env.local` file (or as a Vercel env var) and every device gets AI features without pasting the key. ⚠️ Be aware this bakes the key into the public JS bundle — anyone who finds your deployment URL could extract it. For a personal app that's a judgement call; if you use it, set a monthly spend limit on the key in the Anthropic console, or stick with the Settings-page approach (key never leaves the device).
+> **Local dev:** `pnpm dev` doesn't run the serverless function. To test AI locally either run `vercel dev`, or put `VITE_ANTHROPIC_API_KEY=sk-ant-…` in `.env.local` (dev-only direct calls — never set a `VITE_`-prefixed key in Vercel; it would bake into the public bundle). See [`.env.example`](.env.example).
 
 ## Notes & roadmap ideas
 

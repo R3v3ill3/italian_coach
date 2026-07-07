@@ -10,6 +10,7 @@ type Stage = 'idle' | 'ocr' | 'translating' | 'done' | 'error'
 export function Lens() {
   const navigate = useNavigate()
   const settings = useStore((s) => s.settings)
+  const aiReady = useStore((s) => s.aiReady)
   const recordLensScan = useStore((s) => s.recordLensScan)
 
   const [stage, setStage] = useState<Stage>('idle')
@@ -45,7 +46,7 @@ export function Lens() {
   async function runTranslate(text: string) {
     setStage('translating')
     try {
-      const r = await translateItalian(text, resolveAi(settings))
+      const r = await translateItalian(text, resolveAi(settings), aiReady)
       setResult(r)
       setStage('done')
       recordLensScan()

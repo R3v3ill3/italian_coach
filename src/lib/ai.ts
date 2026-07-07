@@ -1,17 +1,54 @@
 export interface AiSettings {
-  apiKey: string
+  /** Shared passcode sent to the proxy; never the Anthropic key itself. */
+  passcode: string
   model: string
 }
 
-/** Resolve the effective AI settings: Settings-page key first, then build-time env var. */
-export function resolveAi(settings: { apiKey: string; model: string }): AiSettings {
-  const envKey = (import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined) ?? ''
-  return { apiKey: settings.apiKey || envKey, model: settings.model }
+/** Resolve the effective AI settings from the store. The Claude key lives server-side. */
+export function resolveAi(settings: { passcode?: string; model: string }): AiSettings {
+  return { passcode: settings.passcode ?? '', model: settings.model }
 }
+
+/** Local-dev only: allow a direct Anthropic call when running `pnpm dev` with a key set. */
+const DEV_KEY =
+  import.meta.env.DEV ? ((import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined) ?? '') : ''
 
 export interface ChatTurn {
   role: 'user' | 'assistant'
   content: string
+}
+
+export interface AiHealth {
+  ok: boolean
+  requiresPasscode: boolean
+  configured: boolean
+}
+
+/** Ask the proxy whether AI is configured and whether this passcode is accepted. */
+export async function checkAiHealth(passcode: string): Promise<AiHealth> {
+  if (DEV_KEY) return { ok: true, requiresPasscode: false, configured: true }
+  try {
+    const res = await fetch('/api/claude', {
+      method: 'GET',
+      headers: { 'x-app-passcode': passcode || '' },
+    })
+    const data = (await res.json().catch(() => ({}))) as Partial<AiHealth>
+    return {
+      ok: Boolean(data.ok),
+      requiresPasscode: Boolean(data.requiresPasscode),
+      configured: Boolean(data.configured),
+    }
+  } catch {
+    return { ok: false, requiresPasscode: false, configured: false }
+  }
+}
+
+function extractText(data: { content: Array<{ type: string; text?: string }> }): string {
+  return data.content
+    .filter((c) => c.type === 'text')
+    .map((c) => c.text ?? '')
+    .join('')
+    .trim()
 }
 
 async function callClaude(
@@ -20,31 +57,36 @@ async function callClaude(
   messages: ChatTurn[],
   maxTokens = 700,
 ): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const payload = { model: settings.model || 'claude-sonnet-5', max_tokens: maxTokens, system, messages }
+
+  // Local dev: talk to Anthropic directly (localhost only — key not shipped in prod).
+  if (DEV_KEY) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': DEV_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`Claude API error ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`)
+    return extractText((await res.json()) as { content: Array<{ type: string; text?: string }> })
+  }
+
+  // Production: go through our serverless proxy, which holds the key.
+  const res = await fetch('/api/claude', {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': settings.apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: settings.model || 'claude-sonnet-5',
-      max_tokens: maxTokens,
-      system,
-      messages,
-    }),
+    headers: { 'content-type': 'application/json', 'x-app-passcode': settings.passcode || '' },
+    body: JSON.stringify(payload),
   })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    throw new Error(`Claude API error ${res.status}: ${body.slice(0, 200)}`)
+    if (res.status === 401) throw new Error('Not authorised — check the app passcode.')
+    throw new Error(`AI error ${res.status}: ${body.slice(0, 200)}`)
   }
-  const data = (await res.json()) as { content: Array<{ type: string; text?: string }> }
-  return data.content
-    .filter((c) => c.type === 'text')
-    .map((c) => c.text ?? '')
-    .join('')
-    .trim()
+  return extractText((await res.json()) as { content: Array<{ type: string; text?: string }> })
 }
 
 function parseJson<T>(raw: string): T {
@@ -96,8 +138,12 @@ Fix obvious OCR errors silently. Respond with STRICT JSON only, no code fences:
 
 Include 1-4 phrases that are genuinely useful for a beginner to learn and say aloud.`
 
-export async function translateItalian(text: string, settings: AiSettings): Promise<TranslationResult> {
-  if (settings.apiKey) {
+export async function translateItalian(
+  text: string,
+  settings: AiSettings,
+  useAi: boolean,
+): Promise<TranslationResult> {
+  if (useAi) {
     const raw = await callClaude(settings, TRANSLATE_SYSTEM, [{ role: 'user', content: text }], 900)
     try {
       const parsed = parseJson<{ translation: string; phrases?: Array<{ it: string; en: string; tip?: string }> }>(raw)

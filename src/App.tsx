@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { unlockSpeech } from './lib/speech'
+import { Gate } from './components/Gate'
 import { BottomNav } from './components/BottomNav'
 import { TopBar } from './components/TopBar'
 import { Dashboard } from './pages/Dashboard'
@@ -31,6 +32,7 @@ export default function App() {
 
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Gate>
       <div className="min-h-dvh flex flex-col">
         <TopBar />
         <main className="flex-1 w-full max-w-lg mx-auto px-4 pb-28">
@@ -51,6 +53,7 @@ export default function App() {
         </main>
         <BottomNav />
       </div>
+      </Gate>
     </BrowserRouter>
   )
 }

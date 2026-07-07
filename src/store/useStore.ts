@@ -7,7 +7,8 @@ import { newCard, scheduleCard, type ReviewGrade, type SrsCard } from '../lib/sr
 import { todayStr, addDaysStr } from '../lib/utils'
 
 export interface Settings {
-  apiKey: string
+  /** Shared passcode for the AI proxy; the Claude key itself lives server-side. */
+  passcode: string
   model: string
   speechRate: number
   dailyGoal: number
@@ -45,6 +46,10 @@ interface State {
   storiesRead: number
   stories: SavedStory[]
   settings: Settings
+
+  /** Runtime-only: whether the AI proxy is reachable + authorised. Not persisted. */
+  aiReady: boolean
+  setAiReady: (ready: boolean) => void
 
   addXp: (n: number) => string[]
   completeLesson: (unitId: string, score: number, vocabIds: string[]) => string[]
@@ -138,7 +143,9 @@ export const useStore = create<State>()(
 
       return {
         ...initialProgress,
-        settings: { apiKey: '', model: 'claude-sonnet-5', speechRate: 0.95, dailyGoal: 50 },
+        settings: { passcode: '', model: 'claude-sonnet-5', speechRate: 0.95, dailyGoal: 50 },
+        aiReady: false,
+        setAiReady: (ready) => set({ aiReady: ready }),
 
         addXp: (n) => gainXp(n),
 
@@ -224,7 +231,11 @@ export const useStore = create<State>()(
         resetProgress: () => set({ ...initialProgress }),
       }
     },
-    { name: 'parla-italian-coach' },
+    {
+      name: 'parla-italian-coach',
+      // aiReady is a runtime flag re-derived on each load — don't persist it.
+      partialize: ({ aiReady: _aiReady, setAiReady: _setAiReady, ...rest }) => rest,
+    },
   ),
 )
 

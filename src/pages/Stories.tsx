@@ -18,6 +18,7 @@ const TOPIC_PRESETS = [
 export function Stories() {
   const settings = useStore((s) => s.settings)
   const ai = resolveAi(settings)
+  const aiReady = useStore((s) => s.aiReady)
   const srs = useStore((s) => s.srs)
   const stories = useStore((s) => s.stories)
   const addStory = useStore((s) => s.addStory)
@@ -27,7 +28,7 @@ export function Stories() {
   const [error, setError] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
 
-  if (!ai.apiKey) {
+  if (!aiReady) {
     return (
       <div className="pt-10 text-center space-y-4">
         <p className="text-6xl">🪄</p>
@@ -37,11 +38,11 @@ export function Stories() {
           already learned, with audio and a quiz.
         </p>
         <div className="bg-gold-light rounded-3xl p-4 mx-4 text-sm">
-          This needs a Claude API key. Add one in{' '}
+          The AI features aren’t switched on for this app yet. See{' '}
           <Link to="/settings" className="underline font-bold">
             Settings ⚙️
           </Link>{' '}
-          and come straight back.
+          for how they’re configured.
         </div>
       </div>
     )

@@ -22,6 +22,7 @@ export function SpeakPractice({
 }) {
   const settings = useStore((s) => s.settings)
   const ai = resolveAi(settings)
+  const aiReady = useStore((s) => s.aiReady)
   const recordSpeak = useStore((s) => s.recordSpeak)
 
   const [status, setStatus] = useState<Status>('idle')
@@ -91,7 +92,7 @@ export function SpeakPractice({
   }
 
   async function askCoach() {
-    if (!ai.apiKey || score === null) return
+    if (!aiReady || score === null) return
     setAiLoading(true)
     setAiText('')
     try {
@@ -178,7 +179,7 @@ export function SpeakPractice({
             </div>
           )}
 
-          {ai.apiKey ? (
+          {aiReady ? (
             <div className="space-y-2">
               {!aiText && (
                 <button
@@ -198,7 +199,7 @@ export function SpeakPractice({
             </div>
           ) : (
             <p className="text-xs text-center text-espresso-soft">
-              Add a Claude API key in Settings ⚙️ to unlock personalised coaching feedback.
+              AI coaching isn’t switched on for this app. See Settings ⚙️ for details.
             </p>
           )}
 

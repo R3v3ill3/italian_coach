@@ -1,17 +1,13 @@
 import { useState } from 'react'
 import { speakItalian } from '../lib/speech'
-import { resolveAi } from '../lib/ai'
 import { useStore } from '../store/useStore'
 
 export function SettingsPage() {
   const settings = useStore((s) => s.settings)
   const updateSettings = useStore((s) => s.updateSettings)
   const resetProgress = useStore((s) => s.resetProgress)
+  const aiReady = useStore((s) => s.aiReady)
   const [confirmReset, setConfirmReset] = useState(false)
-
-  const envKeyPresent = Boolean((import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined)?.trim())
-  const activeKey = Boolean(resolveAi(settings).apiKey)
-  const keySource = settings.apiKey ? 'this device' : envKeyPresent ? 'the site (env var)' : null
 
   return (
     <div className="space-y-4 pt-1">
@@ -19,36 +15,22 @@ export function SettingsPage() {
 
       <section className="bg-paper rounded-3xl p-4 shadow-sm space-y-3">
         <p className="font-extrabold">AI Coach 🤖</p>
-        <p className="text-sm text-espresso-soft">
-          Add a Claude API key (from{' '}
-          <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" className="underline font-bold">
-            console.anthropic.com
-          </a>
-          ) to unlock personalised pronunciation coaching and smart Lens translations. Stored only on this device.
-        </p>
         <div
           className={`rounded-2xl px-3 py-2 text-sm font-bold ${
-            activeKey ? 'bg-basil/10 text-basil' : 'bg-tomato-light text-tomato'
+            aiReady ? 'bg-basil/10 text-basil' : 'bg-tomato-light text-tomato'
           }`}
         >
-          {activeKey ? `✅ AI is active — key from ${keySource}.` : '⚠️ No API key detected — AI features are off.'}
-          {!settings.apiKey && (
-            <span className="block font-semibold text-espresso-soft mt-1">
-              {envKeyPresent
-                ? 'A site-wide key is baked into this build.'
-                : 'No site key found in this build. Paste one below, or set VITE_ANTHROPIC_API_KEY in Vercel and redeploy.'}
-            </span>
-          )}
+          {aiReady ? '✅ AI features are active.' : '⚠️ AI features are off.'}
+          <span className="block font-semibold text-espresso-soft mt-1">
+            {aiReady
+              ? 'Coach Gio, Conversa, Storie and smart Lens are all working.'
+              : 'The Claude key is set server-side (ANTHROPIC_API_KEY on Vercel). If AI is off, check that env var is set and redeploy.'}
+          </span>
         </div>
-        <input
-          type="password"
-          value={settings.apiKey}
-          onChange={(e) => updateSettings({ apiKey: e.target.value.trim() })}
-          placeholder="sk-ant-…"
-          autoCapitalize="none"
-          autoCorrect="off"
-          className="w-full bg-cream rounded-2xl px-3 py-3 font-mono text-sm outline-none focus:ring-2 ring-basil"
-        />
+        <p className="text-sm text-espresso-soft">
+          Your Claude key lives on the server, never in this app — so the public URL can’t leak it. Access is protected
+          by the app passcode.
+        </p>
         <label className="block text-sm font-bold">
           Model
           <select
@@ -60,6 +42,14 @@ export function SettingsPage() {
             <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (faster, cheaper)</option>
           </select>
         </label>
+        {settings.passcode && (
+          <button
+            onClick={() => updateSettings({ passcode: '' })}
+            className="w-full border-2 border-espresso/20 text-espresso rounded-2xl py-2.5 font-bold text-sm"
+          >
+            🔒 Lock this device (forget passcode)
+          </button>
+        )}
       </section>
 
       <section className="bg-paper rounded-3xl p-4 shadow-sm space-y-3">

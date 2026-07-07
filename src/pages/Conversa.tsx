@@ -15,12 +15,11 @@ interface Msg {
 }
 
 export function Conversa() {
-  const settings = useStore((s) => s.settings)
-  const ai = resolveAi(settings)
+  const aiReady = useStore((s) => s.aiReady)
 
   const [scenario, setScenario] = useState<Scenario | null>(null)
 
-  if (!ai.apiKey) {
+  if (!aiReady) {
     return (
       <div className="pt-10 text-center space-y-4">
         <p className="text-6xl">💬</p>
@@ -30,11 +29,11 @@ export function Conversa() {
           that speaks simple Italian, corrects you kindly, and always suggests what you could say next.
         </p>
         <div className="bg-gold-light rounded-3xl p-4 mx-4 text-sm">
-          This needs a Claude API key. Add one in{' '}
+          The AI features aren’t switched on for this app yet. See{' '}
           <Link to="/settings" className="underline font-bold">
             Settings ⚙️
           </Link>{' '}
-          and come straight back.
+          for how they’re configured.
         </div>
       </div>
     )
