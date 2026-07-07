@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { unlockSpeech } from './lib/speech'
 import { BottomNav } from './components/BottomNav'
 import { TopBar } from './components/TopBar'
 import { Dashboard } from './pages/Dashboard'
@@ -15,6 +17,18 @@ import { Review } from './pages/Review'
 import { SettingsPage } from './pages/SettingsPage'
 
 export default function App() {
+  // Prime the speech engine on the very first user interaction. iOS Safari
+  // requires speech to be unlocked inside a user gesture before it will play.
+  useEffect(() => {
+    const prime = () => unlockSpeech()
+    window.addEventListener('pointerdown', prime, { once: true })
+    window.addEventListener('touchstart', prime, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', prime)
+      window.removeEventListener('touchstart', prime)
+    }
+  }, [])
+
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="min-h-dvh flex flex-col">

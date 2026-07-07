@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { speakItalian } from '../lib/speech'
+import { resolveAi } from '../lib/ai'
 import { useStore } from '../store/useStore'
 
 export function SettingsPage() {
@@ -7,6 +8,10 @@ export function SettingsPage() {
   const updateSettings = useStore((s) => s.updateSettings)
   const resetProgress = useStore((s) => s.resetProgress)
   const [confirmReset, setConfirmReset] = useState(false)
+
+  const envKeyPresent = Boolean((import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined)?.trim())
+  const activeKey = Boolean(resolveAi(settings).apiKey)
+  const keySource = settings.apiKey ? 'this device' : envKeyPresent ? 'the site (env var)' : null
 
   return (
     <div className="space-y-4 pt-1">
@@ -21,6 +26,20 @@ export function SettingsPage() {
           </a>
           ) to unlock personalised pronunciation coaching and smart Lens translations. Stored only on this device.
         </p>
+        <div
+          className={`rounded-2xl px-3 py-2 text-sm font-bold ${
+            activeKey ? 'bg-basil/10 text-basil' : 'bg-tomato-light text-tomato'
+          }`}
+        >
+          {activeKey ? `✅ AI is active — key from ${keySource}.` : '⚠️ No API key detected — AI features are off.'}
+          {!settings.apiKey && (
+            <span className="block font-semibold text-espresso-soft mt-1">
+              {envKeyPresent
+                ? 'A site-wide key is baked into this build.'
+                : 'No site key found in this build. Paste one below, or set VITE_ANTHROPIC_API_KEY in Vercel and redeploy.'}
+            </span>
+          )}
+        </div>
         <input
           type="password"
           value={settings.apiKey}

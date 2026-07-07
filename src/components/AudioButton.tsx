@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { speakItalian } from '../lib/speech'
+import { speakItalian, unlockSpeech } from '../lib/speech'
 import { useStore } from '../store/useStore'
 import { cn } from '../lib/utils'
 
@@ -23,11 +23,11 @@ export function AudioButton({
     <button
       type="button"
       aria-label={slow ? 'Play slowly' : 'Play audio'}
-      onClick={async (e) => {
+      onClick={(e) => {
         e.stopPropagation()
+        unlockSpeech()
         setPlaying(true)
-        await speakItalian(text, { rate: slow ? rate * 0.62 : rate })
-        setPlaying(false)
+        void speakItalian(text, { rate: slow ? rate * 0.62 : rate }).finally(() => setPlaying(false))
       }}
       className={cn(
         'rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-90 shadow-sm',

@@ -1,35 +1,26 @@
 let voicesCache: SpeechSynthesisVoice[] = []
 
-function loadVoices(): Promise<SpeechSynthesisVoice[]> {
-  return new Promise((resolve) => {
-    const have = window.speechSynthesis.getVoices()
-    if (have.length > 0) {
-      voicesCache = have
-      resolve(have)
-      return
-    }
-    const handler = () => {
-      voicesCache = window.speechSynthesis.getVoices()
-      window.speechSynthesis.removeEventListener('voiceschanged', handler)
-      resolve(voicesCache)
-    }
-    window.speechSynthesis.addEventListener('voiceschanged', handler)
-    // Safari sometimes never fires voiceschanged; poll as a backup.
-    setTimeout(() => {
-      const v = window.speechSynthesis.getVoices()
-      if (v.length > 0) {
-        voicesCache = v
-        resolve(v)
-      }
-    }, 400)
-  })
+function refreshVoices() {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return
+  const v = window.speechSynthesis.getVoices()
+  if (v.length > 0) voicesCache = v
+}
+
+// Eagerly warm the voice list. iOS/Safari populate voices asynchronously and
+// sometimes only after a `voiceschanged` event fires, so we listen and poll.
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  refreshVoices()
+  window.speechSynthesis.addEventListener('voiceschanged', refreshVoices)
+  setTimeout(refreshVoices, 300)
+  setTimeout(refreshVoices, 1200)
 }
 
 const PREFERRED_IT_VOICES = ['alice', 'federica', 'luca', 'emma', 'elsa', 'isabella', 'google italiano']
 
-export async function pickItalianVoice(): Promise<SpeechSynthesisVoice | null> {
-  const voices = voicesCache.length > 0 ? voicesCache : await loadVoices()
-  const italian = voices.filter((v) => v.lang.toLowerCase().startsWith('it'))
+/** Synchronously pick the best Italian voice from the warmed cache (may be null early on). */
+function pickItalianVoiceSync(): SpeechSynthesisVoice | null {
+  if (voicesCache.length === 0) refreshVoices()
+  const italian = voicesCache.filter((v) => v.lang.toLowerCase().startsWith('it'))
   if (italian.length === 0) return null
   for (const name of PREFERRED_IT_VOICES) {
     const match = italian.find((v) => v.name.toLowerCase().includes(name))
@@ -38,35 +29,61 @@ export async function pickItalianVoice(): Promise<SpeechSynthesisVoice | null> {
   return italian[0]
 }
 
+export async function pickItalianVoice(): Promise<SpeechSynthesisVoice | null> {
+  return pickItalianVoiceSync()
+}
+
+let unlocked = false
+/**
+ * iOS Safari only lets speech play if the FIRST `speak()` happens directly inside
+ * a user gesture. Call this from a tap/click handler once to prime the engine.
+ */
+export function unlockSpeech() {
+  if (unlocked || typeof window === 'undefined' || !window.speechSynthesis) return
+  unlocked = true
+  refreshVoices()
+  try {
+    const u = new SpeechSynthesisUtterance('')
+    u.volume = 0
+    window.speechSynthesis.speak(u)
+  } catch {
+    /* ignore */
+  }
+}
+
 export interface SpeakOptions {
   rate?: number
   onEnd?: () => void
 }
 
-export async function speakItalian(text: string, opts: SpeakOptions = {}): Promise<void> {
-  const synth = window.speechSynthesis
+export function speakItalian(text: string, opts: SpeakOptions = {}): Promise<void> {
+  const synth = window?.speechSynthesis
+  if (!synth) return Promise.resolve()
+  // CRITICAL for iOS: no `await` before speak() — that would break the user-gesture
+  // chain and Safari would silently refuse to play. Pick the voice synchronously.
   synth.cancel()
   const utter = new SpeechSynthesisUtterance(text)
   utter.lang = 'it-IT'
-  const voice = await pickItalianVoice()
+  const voice = pickItalianVoiceSync()
   if (voice) utter.voice = voice
   utter.rate = opts.rate ?? 0.95
   utter.pitch = 1
   return new Promise((resolve) => {
-    utter.onend = () => {
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
       opts.onEnd?.()
       resolve()
     }
-    utter.onerror = () => {
-      opts.onEnd?.()
-      resolve()
-    }
+    utter.onend = finish
+    utter.onerror = finish
     synth.speak(utter)
   })
 }
 
 export function stopSpeaking() {
-  window.speechSynthesis.cancel()
+  window.speechSynthesis?.cancel()
 }
 
 // ---------- Speech recognition (webkit prefixed on Safari/Chrome) ----------
