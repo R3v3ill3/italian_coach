@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { speakItalian } from '../lib/speech'
+import { getVoiceInfo, speakItalian, type VoiceInfo } from '../lib/speech'
 import { useStore } from '../store/useStore'
 
 export function SettingsPage() {
@@ -8,6 +8,33 @@ export function SettingsPage() {
   const resetProgress = useStore((s) => s.resetProgress)
   const aiReady = useStore((s) => s.aiReady)
   const [confirmReset, setConfirmReset] = useState(false)
+
+  const [voiceInfo, setVoiceInfo] = useState<VoiceInfo | null>(null)
+  const [voiceStatus, setVoiceStatus] = useState('')
+
+  function testVoice() {
+    setVoiceInfo(getVoiceInfo())
+    setVoiceStatus('▶️ sending to the speech engine…')
+    let started = false
+    const timer = setTimeout(() => {
+      if (!started) setVoiceStatus('⚠️ No "start" event after 3s — the engine accepted it but produced no audio. Check the ring/silent switch and volume.')
+    }, 3000)
+    speakItalian('Ciao! Benvenuto in Italia. Il caffè è pronto.', {
+      onStart: () => {
+        started = true
+        clearTimeout(timer)
+        setVoiceStatus('🔊 Speaking now — you should hear it.')
+      },
+      onEnd: () => {
+        clearTimeout(timer)
+        setVoiceStatus((s) => (started ? '✅ Finished speaking.' : s))
+      },
+      onError: (err) => {
+        clearTimeout(timer)
+        setVoiceStatus(`⚠️ Speech engine error: ${err}`)
+      },
+    })
+  }
 
   return (
     <div className="space-y-4 pt-1">
@@ -67,15 +94,32 @@ export function SettingsPage() {
           />
         </label>
         <button
-          onClick={() => speakItalian('Ciao! Benvenuto in Italia. Il caffè è pronto.')}
+          onClick={testVoice}
           className="w-full bg-basil text-white rounded-2xl py-2.5 font-bold"
         >
           🔊 Test the Italian voice
         </button>
-        <p className="text-xs text-espresso-soft">
-          Uses your device's built-in Italian voice. On iPhone you can install higher-quality voices under Settings →
-          Accessibility → Spoken Content → Voices → Italian.
-        </p>
+
+        {voiceStatus && (
+          <div className="bg-cream rounded-2xl p-3 text-sm font-semibold">{voiceStatus}</div>
+        )}
+
+        {voiceInfo && (
+          <div className="bg-cream rounded-2xl p-3 text-xs space-y-1">
+            <p className="font-bold">Diagnostics</p>
+            <p>Speech engine: {voiceInfo.supported ? '✅ available' : '❌ not available in this browser'}</p>
+            <p>Voices loaded: {voiceInfo.total}</p>
+            <p>Italian voices: {voiceInfo.italian.length > 0 ? voiceInfo.italian.join(', ') : '— none found —'}</p>
+          </div>
+        )}
+
+        <div className="bg-gold-light rounded-2xl p-3 text-xs space-y-1">
+          <p className="font-bold">No sound on iPhone? Check, in order:</p>
+          <p>1. The <strong>ring/silent switch</strong> on the left edge — silent mode mutes web speech. Flip it so it's <em>not</em> showing orange.</p>
+          <p>2. Turn the <strong>volume up</strong> with the side buttons while this app is open.</p>
+          <p>3. Install a voice under <strong>Settings → Accessibility → Spoken Content → Voices → Italian</strong> (tap the cloud to download).</p>
+          <p>4. Tap the test button again — it must be a direct tap to start audio.</p>
+        </div>
       </section>
 
       <section className="bg-paper rounded-3xl p-4 shadow-sm space-y-3">

@@ -54,11 +54,16 @@ export function unlockSpeech() {
 export interface SpeakOptions {
   rate?: number
   onEnd?: () => void
+  onStart?: () => void
+  onError?: (err: string) => void
 }
 
 export function speakItalian(text: string, opts: SpeakOptions = {}): Promise<void> {
   const synth = window?.speechSynthesis
-  if (!synth) return Promise.resolve()
+  if (!synth) {
+    opts.onError?.('speechSynthesis-unsupported')
+    return Promise.resolve()
+  }
   // CRITICAL for iOS: no `await` before speak() — that would break the user-gesture
   // chain and Safari would silently refuse to play. Pick the voice synchronously.
   synth.cancel()
@@ -76,14 +81,43 @@ export function speakItalian(text: string, opts: SpeakOptions = {}): Promise<voi
       opts.onEnd?.()
       resolve()
     }
+    utter.onstart = () => opts.onStart?.()
     utter.onend = finish
-    utter.onerror = finish
+    utter.onerror = (e: SpeechSynthesisErrorEvent) => {
+      opts.onError?.(e?.error ?? 'error')
+      finish()
+    }
     synth.speak(utter)
+    // iOS Safari sometimes starts the engine in a paused state; nudge it.
+    try {
+      synth.resume()
+    } catch {
+      /* ignore */
+    }
   })
 }
 
 export function stopSpeaking() {
   window.speechSynthesis?.cancel()
+}
+
+export interface VoiceInfo {
+  supported: boolean
+  total: number
+  italian: string[]
+}
+
+/** Snapshot of the speech engine state for on-device diagnostics. */
+export function getVoiceInfo(): VoiceInfo {
+  const supported = typeof window !== 'undefined' && 'speechSynthesis' in window
+  if (supported) refreshVoices()
+  return {
+    supported,
+    total: voicesCache.length,
+    italian: voicesCache
+      .filter((v) => v.lang.toLowerCase().startsWith('it'))
+      .map((v) => `${v.name} (${v.lang})`),
+  }
 }
 
 // ---------- Speech recognition (webkit prefixed on Safari/Chrome) ----------
